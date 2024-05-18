@@ -1,170 +1,386 @@
+/* USER CODE BEGIN Header */
+/*******************************************************************************
+ * EE 329 A4 Interrupts Reaction Timer MAIN FUNCTION
+ *******************************************************************************
+ * @file           : main.c
+ * project         : EE 329 S'24 Assignment A5
+ * authors         : Alain Kanadjian (aakanadj@ca.poly.edu)
+ *
+ * version         : 0.2
+ * date            : 240515
+ * compiler        : STM32CubeIDE v.1.15.0 Build: 14980_20230301_1550 (UTC)
+ * target          : NUCLEO-L4A6ZG
+ * @attention      : (c) 2024 STMicroelectronics.  All rights reserved.
+ * Citations:
+ * Ethan Robson, EE 329 F'24 student. (2024-May-15).
+ * Personal Communication: Sent me his code to reference (init and while loop)
+ *
+ * Wilson Szeto, CPE Student. (2024-May-14)
+ * Personal Communcation: Send me his functions to reference
+ *******************************************************************************
+ * Main Function PLAN
+ *
+ *******************************************************************************
+ * REVISION HISTORY
+ *******************************************************************************
+ * NOTES
+ *
+ * WIRING
+ *
+ * DAC wiring
+ *  CS  -> GPIOA4
+ *  SDK -> GPIOA5
+ *  SDI -> GPIOA7
+ *  Vdd -> 3.3V
+ *  SHDN-> 3.3V
+ *  Vss -> GND
+ *  LDAC-> GND
+ *  Vout-> AD2
+ *
+ *
+ * Keypad Wiring
+ * Row1 -> GPIOC0
+ * Row2 -> GPIOC1
+ * Row3 -> GPIOC2
+ * Row4 -> GPIOC3
+ * Col1 -> GPIOC4
+ * Col2 -> GPIOC5
+ * Col3 -> GPIOC6
+ *
+ *******************************************************************************
+ */
+/* USER CODE END Header */
+/* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "keypad.h"
 #include "DELAY.h"
 #include <math.h>
 
-int main(void)
-{
-  uint8_t index=0;
-  uint8_t keypadnum[3]={0,0,0};
-  uint32_t voltage=0;
-  uint8_t keypad=0;
-  uint8_t num_key = 0;
-  uint32_t output_volt = 0;
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
-  /* Configure the system clock */
-  SystemClock_Config();
-  setup();
-  /* Initialize all configured peripherals */
-  GPIOA_init();
+int main(void) {
+	uint32_t voltage = 0;
+	uint8_t num_key = 0;
+	uint32_t output_volt = 0;
+	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+	HAL_Init();
+	/* Configure the system clock */
+	SystemClock_Config();
+	setup();
+	/* Initialize all configured peripherals */
+	DAC_init();
 
-  SPI_init();
-  DAC_write(0);
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  delay_us(1000);
-  //voltage = 1000;
-  voltage=DAC_volts(1000);
-  //DAC_write(voltage);
-  //uint16_t prevVolts = 0;
-  while (1)
-  {
-  int output = Keypad_Read(3,4); // get key value
-  if (output != -1) {
-	if (output > 9) {// if not int key pressed reset the values
-	  num_key = 0;
-	  output_volt = 0;
-	  DAC_write(0);
-	}
-	// first key is 100 hundreds
-	else if (num_key == 0) {
-	  output_volt = (output * 100);
-	  num_key++;
-	}
+	delay_us(1000);
+	voltage = DAC_volts(3200);
+//I commented out the while loop bc i dont use keypad when measuring
+	while (1) {
 
-	// 2nd key is 10s
-	else if (num_key == 1) {
-	  output_volt = output_volt + (output * 10);
-	  num_key++;
+		DAC_write(voltage); //Set DAC to any initial value
+//		int output = Keypad_Read(3, 4); // get key value
+//		if (output != -1) {
+//			if (output > 9) { // if not int key pressed reset the values
+//				num_key = 0;
+//				output_volt = 0;
+//				DAC_write(0);
+//			}
+//			// first key is 100 hundreds
+//			else if (num_key == 0) {
+//				output_volt = (output * 100);
+//				num_key++;
+//			}
+//
+//			// 2nd key is 10s
+//			else if (num_key == 1) {
+//				output_volt = output_volt + (output * 10);
+//				num_key++;
+//			}
+//
+//			// 3rd key is ones
+//			else { // third press write to dac and reset the values
+//				output_volt = output_volt + (output);
+//				uint32_t dig_val = DAC_volts((output_volt * 10)); // change to mV
+//				DAC_write(dig_val);
+//				output_volt = 0;
+//				num_key = 0;
+//			}
+//			delay_us(500000);
+//		}
 	}
-
-	// 3rd key is ones
-	else { // third press write to dac and reset the values
-	  output_volt = output_volt + (output);
-	  uint32_t dig_val = DAC_volts((output_volt * 10)); // change to mV
-	  DAC_write(dig_val);
-	  output_volt = 0;
-	  num_key = 0;
-	}
-	delay_us(500000);
-  }
-}
 }
 
-void GPIOA_init(void){
+/* -----------------------------------------------------------------------------
+ * function : GPIOA_init()
+ * INs      : none
+ * OUTs     : none
+ * action   : Setup for GPIOA pins
+ * authors  : Alain Kanadjian aakanadj@calpoly.edu
+ * 			:
+ * version  : 0.1
+ * date     : 240515
+ * -------------------------------------------------------------------------- */
+
+void GPIOA_init(void) {
 	// enable clock for GPIOA & SPI1
-	   RCC->AHB2ENR |= (RCC_AHB2ENR_GPIOAEN);                // GPIOA: DAC NSS/SCK/SDO
-	   RCC->APB2ENR |= (RCC_APB2ENR_SPI1EN);                 // SPI1 port
-	   /* USER ADD GPIO configuration of MODER/PUPDR/OTYPER/OSPEEDR registers HERE */
-	   // configs the registers in order: OTYPER, PUPDR, OSPEEDR, MODDER
-	   GPIOA -> OTYPER &= ~(GPIO_OTYPER_OT4 | // PA4: NSS
-							GPIO_OTYPER_OT5 | // PA5: SCK
-							GPIO_OTYPER_OT6 | // PA6: MISO
-							GPIO_OTYPER_OT7); // PA7: MOSI
-	   GPIOA -> PUPDR &= ~(GPIO_PUPDR_PUPD4 |
-					   	   GPIO_PUPDR_PUPD5 |
-						   GPIO_PUPDR_PUPD6 |
-						   GPIO_PUPDR_PUPD7); // no PUPDRs for any pins
-	   GPIOA -> OSPEEDR |= ((3 << GPIO_OSPEEDR_OSPEED4_Pos) |
-							(3 << GPIO_OSPEEDR_OSPEED5_Pos) |
-							(3 << GPIO_OSPEEDR_OSPEED6_Pos) |
-							(3 << GPIO_OSPEEDR_OSPEED7_Pos)); // maximum speed
-	   GPIOA -> MODER &= ~(GPIO_MODER_MODE4 |
-					   	   GPIO_MODER_MODE5 |
-						   GPIO_MODER_MODE6 |
-						   GPIO_MODER_MODE7); // reset the GPIO ports
-	   GPIOA -> MODER |= (GPIO_MODER_MODE4_1 |
-					  	  GPIO_MODER_MODE5_1 |
-						  GPIO_MODER_MODE6_1 |
-						  GPIO_MODER_MODE7_1); // alternate function mode
-
-	   // configure AFR for SPI1 function (1 of 3 SPI bits shown here)
-	   // For SPI, PA4-7 are all on AF5
-	   GPIOA->AFR[0] &= ~((0x000F << GPIO_AFRL_AFSEL4_Pos)); // clear nibble for bit 7 AF
-	   GPIOA->AFR[0] |=  ((0x0005 << GPIO_AFRL_AFSEL4_Pos)); // set b7 AF to SPI1 (fcn 5)
-
-	   GPIOA->AFR[0] &= ~((0x000F << GPIO_AFRL_AFSEL5_Pos)); // clear nibble for bit 7 AF
-	   GPIOA->AFR[0] |=  ((0x0005 << GPIO_AFRL_AFSEL5_Pos)); // set b7 AF to SPI1 (fcn 5)
-
-	   GPIOA->AFR[0] &= ~((0x000F << GPIO_AFRL_AFSEL6_Pos)); // clear nibble for bit 7 AF
-	   GPIOA->AFR[0] |=  ((0x0005 << GPIO_AFRL_AFSEL6_Pos)); // set b7 AF to SPI1 (fcn 5)
-
-	   GPIOA->AFR[0] &= ~((0x000F << GPIO_AFRL_AFSEL7_Pos)); // clear nibble for bit 7 AF
-	   GPIOA->AFR[0] |=  ((0x0005 << GPIO_AFRL_AFSEL7_Pos)); // set b7 AF to SPI1 (fcn 5
+	RCC->AHB2ENR |= (RCC_AHB2ENR_GPIOAEN);             // GPIOA: DAC NSS/SCK/SDO
+	RCC->APB2ENR |= (RCC_APB2ENR_SPI1EN);                 // SPI1 port
 	/* USER ADD GPIO configuration of MODER/PUPDR/OTYPER/OSPEEDR registers HERE */
+	// configs the registers in order: OTYPER, PUPDR, OSPEEDR, MODDER
+	GPIOA->OTYPER &= ~(GPIO_OTYPER_OT4 | // PA4: NSS
+			GPIO_OTYPER_OT5 | // PA5: SCK
+			GPIO_OTYPER_OT6 | // PA6: MISO
+			GPIO_OTYPER_OT7); // PA7: MOSI
+	GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPD4 |
+	GPIO_PUPDR_PUPD5 |
+	GPIO_PUPDR_PUPD6 |
+	GPIO_PUPDR_PUPD7); // no PUPDRs for any pins
+	GPIOA->OSPEEDR |= ((3 << GPIO_OSPEEDR_OSPEED4_Pos)
+			| (3 << GPIO_OSPEEDR_OSPEED5_Pos) | (3 << GPIO_OSPEEDR_OSPEED6_Pos)
+			| (3 << GPIO_OSPEEDR_OSPEED7_Pos)); // maximum speed
+	GPIOA->MODER &= ~(GPIO_MODER_MODE4 |
+	GPIO_MODER_MODE5 |
+	GPIO_MODER_MODE6 |
+	GPIO_MODER_MODE7); // reset the GPIO ports
+	GPIOA->MODER |= (GPIO_MODER_MODE4_1 |
+	GPIO_MODER_MODE5_1 |
+	GPIO_MODER_MODE6_1 |
+	GPIO_MODER_MODE7_1); // alternate function mode
 	// configure AFR for SPI1 function (1 of 3 SPI bits shown here)
+	// For SPI, PA4-7 are all on AF5
+	GPIOA->AFR[0] &= ~((0x000F << GPIO_AFRL_AFSEL4_Pos)); // clear nibble for bit 7 AF
+	GPIOA->AFR[0] |= ((0x0005 << GPIO_AFRL_AFSEL4_Pos)); // set b7 AF to SPI1 (fcn 5)
+	GPIOA->AFR[0] &= ~((0x000F << GPIO_AFRL_AFSEL5_Pos)); // clear nibble for bit 7 AF
+	GPIOA->AFR[0] |= ((0x0005 << GPIO_AFRL_AFSEL5_Pos)); // set b7 AF to SPI1 (fcn 5)
+	GPIOA->AFR[0] &= ~((0x000F << GPIO_AFRL_AFSEL6_Pos)); // clear nibble for bit 7 AF
+	GPIOA->AFR[0] |= ((0x0005 << GPIO_AFRL_AFSEL6_Pos)); // set b7 AF to SPI1 (fcn 5)
+	GPIOA->AFR[0] &= ~((0x000F << GPIO_AFRL_AFSEL7_Pos)); // clear nibble for bit 7 AF
+	GPIOA->AFR[0] |= ((0x0005 << GPIO_AFRL_AFSEL7_Pos)); // set b7 AF to SPI1 (fcn 5
 }
 
-void SPI_init(void){
-
+/* -----------------------------------------------------------------------------
+ * function : SPI_init()
+ * INs      : none
+ * OUTs     : none
+ * action   : Setup for DAC ports
+ * authors  : Alain Kanadjian aakanadj@calpoly.edu
+ * 			:
+ * version  : 0.1
+ * date     : 240515
+ * -------------------------------------------------------------------------- */
+void SPI_init(void) {
 	// SPI config as specified @ STM32L4 RM0351 rev.9 p.1459
-   // called by or with DAC_init()
-   // build control registers CR1 & CR2 for SPI control of peripheral DAC
-   // assumes no active SPI xmits & no recv data in process (BSY=0)
-   // CR1 (reset value = 0x0000)
-   SPI1->CR1=(0x0000);
-   SPI1->CR1 &= ~( SPI_CR1_SPE );             	// disable SPI for config
-   SPI1->CR1 &= ~( SPI_CR1_RXONLY );          	// recv-only OFF
-   SPI1->CR1 &= ~( SPI_CR1_LSBFIRST );        	// data bit order MSb:LSb
-   SPI1->CR1 &= ~( SPI_CR1_CPOL | SPI_CR1_CPHA ); // SCLK polarity:phase = 0:0
-   SPI1->CR1 |=	 SPI_CR1_MSTR;              	// MCU is SPI controller
-   //SPI1->CR1 &= ~(SPI_CR1_SSM); //slave management
-   //SPI1->CR1 |= SPI_CR1_SSI; //internal select as high
-   // CR2 (reset value = 0x0700 : 8b data)
-   SPI1->CR2 = (0x0700);
-   SPI1->CR2 &= ~( SPI_CR2_TXEIE | SPI_CR2_RXNEIE ); // disable FIFO intrpts
-   SPI1->CR2 &= ~( SPI_CR2_FRF);              	// Moto frame format
-   SPI1->CR2 |=	 SPI_CR2_NSSP;              	// auto-generate NSS pulse
-   SPI1->CR2 |=	 SPI_CR2_DS;                	// 16-bit data
-   SPI1->CR2 |=	 SPI_CR2_SSOE;              	// enable SS output
-   // CR1
-   SPI1->CR1 |=	 SPI_CR1_SPE;               	// re-enable SPI for ops
-
-
-
-	//SPI1->CR1 &= ~(SPI_CR1_BR);
-	//SPI1->CR1 |= SPI_CR1_NSSP;
-
-   //SPI1->CR2 |=	 (SPI_CR2_SSOE);              	// enable SS output
+	// called by or with DAC_init()
+	// build control registers CR1 & CR2 for SPI control of peripheral DAC
+	// assumes no active SPI xmits & no recv data in process (BSY=0)
+	SPI1->CR1 = (0x0000);
+	SPI1->CR1 &= ~( SPI_CR1_SPE);             	// disable SPI for config
+	SPI1->CR1 &= ~( SPI_CR1_RXONLY);          	// recv-only OFF
+	SPI1->CR1 &= ~( SPI_CR1_LSBFIRST);        	// data bit order MSb:LSb
+	SPI1->CR1 &= ~( SPI_CR1_CPOL | SPI_CR1_CPHA); // SCLK polarity:phase = 0:0
+	SPI1->CR1 |= SPI_CR1_MSTR;              	// MCU is SPI controller
+	SPI1->CR2 = (0x0700);
+	SPI1->CR2 &= ~( SPI_CR2_TXEIE | SPI_CR2_RXNEIE); // disable FIFO intrpts
+	SPI1->CR2 &= ~( SPI_CR2_FRF);              	// Moto frame format
+	SPI1->CR2 |= SPI_CR2_NSSP;              	// auto-generate NSS pulse
+	SPI1->CR2 |= SPI_CR2_DS;                	// 16-bit data
+	SPI1->CR2 |= SPI_CR2_SSOE;              	// enable SS output
+	SPI1->CR1 |= SPI_CR1_SPE;               	// re-enable SPI for ops
 }
 
-void DAC_write(uint16_t in){
-
-  SPI1->CR1 &= ~SPI_CR1_SSI; // Clear the SSI bit, setting the NSS pin low
-							 // (selected slave device)
-
-  // check if the buffer is empty
-  while (!(SPI1->SR & SPI_SR_TXE)) {
-  }
-
-  // writing to the DAC
-  SPI1->DR = 0x1000 + in;
-  while (SPI1->SR & SPI_SR_BSY) {
-  } // Wait for the SPI bus to become idle
-
-  SPI1->CR1 |= SPI_CR1_SSI; // Set the SSI bit, setting the NSS pin high
-							// (deselect slave device)
+/* -----------------------------------------------------------------------------
+ * function : DAC_write()
+ * INs      : uint16_t in
+ * OUTs     : none
+ * action   : Sends data to DAC through SPI pins
+ * authors  : Alain Kanadjian aakanadj@calpoly.edu
+ * 			:
+ * version  : 0.1
+ * date     : 240515
+ * -------------------------------------------------------------------------- */
+void DAC_write(uint16_t in) {
+	SPI1->CR1 &= ~SPI_CR1_SSI; // Clear the SSI bit, setting the NSS pin low
+	// check if the buffer is empty
+	while (!(SPI1->SR & SPI_SR_TXE)) {
+	}
+	// writing to the DAC
+	SPI1->DR = 0x1000 + in;
+	while (SPI1->SR & SPI_SR_BSY) {
+	} // Wait for the SPI bus to become idle
+	SPI1->CR1 |= SPI_CR1_SSI; // Set the SSI bit, setting the NSS pin high
 }
 
-uint16_t DAC_volts(uint16_t mv){ //4095 is the max value
-	//mv=mv+100;
-   if (mv > 3300) {
-	   //mv= (3300); // account for 2x gain
-	   return 3283;//(mv/2)*4095/3300;
-   }
-   else {
-	   //return (((mv) *1.4) -0.712849); // 1x gain
-	   return ((4095*mv)/3300)*0.980257+0.01222256; //bad ratio rn
-   }
+/* -----------------------------------------------------------------------------
+ * function : DAC_volts()
+ * INs      : uint16_t mv
+ * OUTs     : uint16_t converted mv
+ * action   : Converts MV to be within DAC thresholds
+ * authors  : Alain Kanadjian aakanadj@calpoly.edu
+ * 			:
+ * version  : 0.1
+ * date     : 240515
+ * -------------------------------------------------------------------------- */
+uint16_t DAC_volts(uint16_t mv) { //4095 is the max value
+	if (mv > 3300) //upper limit
+			{
+		return 3284; //returns 3.3 volts
+	} else {
+		return ((4095 * (mv * 0.8054)) / 3300); //formula for DAC
+	}
 }
+
+/* -----------------------------------------------------------------------------
+ * function : DAC_init()
+ * INs      : none
+ * OUTs     : none
+ * action   : Setup for DAC (order of inits)
+ * authors  : Alain Kanadjian aakanadj@calpoly.edu
+ * 			:
+ * version  : 0.1
+ * date     : 240515
+ * -------------------------------------------------------------------------- */
+void DAC_init(void) {
+	GPIOA_init(); //Runs proper order
+	SPI_init();
+}
+
+/**
+ * @brief System Clock Configuration
+ * @retval None
+ */
+void SystemClock_Config(void) {
+	RCC_OscInitTypeDef RCC_OscInitStruct = { 0 };
+	RCC_ClkInitTypeDef RCC_ClkInitStruct = { 0 };
+
+	/** Configure the main internal regulator output voltage
+	 */
+	if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1)
+			!= HAL_OK) {
+		Error_Handler();
+	}
+
+	/** Initializes the RCC Oscillators according to the specified parameters
+	 * in the RCC_OscInitTypeDef structure.
+	 */
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
+	RCC_OscInitStruct.MSIState = RCC_MSI_ON;
+	RCC_OscInitStruct.MSICalibrationValue = 0;
+	RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
+	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+		Error_Handler();
+	}
+
+	/** Initializes the CPU, AHB and APB buses clocks
+	 */
+	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
+			| RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_MSI;
+	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+
+	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK) {
+		Error_Handler();
+	}
+}
+
+/**
+ * @brief GPIO Initialization Function
+ * @param None
+ * @retval None
+ */
+//static void MX_GPIO_Init(void)
+//{
+//  GPIO_InitTypeDef GPIO_InitStruct = {0};
+///* USER CODE BEGIN MX_GPIO_Init_1 */
+///* USER CODE END MX_GPIO_Init_1 */
+//
+//  /* GPIO Ports Clock Enable */
+//  __HAL_RCC_GPIOC_CLK_ENABLE();
+//  __HAL_RCC_GPIOH_CLK_ENABLE();
+//  __HAL_RCC_GPIOB_CLK_ENABLE();
+//  __HAL_RCC_GPIOG_CLK_ENABLE();
+//  HAL_PWREx_EnableVddIO2();
+//  __HAL_RCC_GPIOA_CLK_ENABLE();
+//
+//  /*Configure GPIO pin Output Level */
+//  HAL_GPIO_WritePin(GPIOB, LD3_Pin|LD2_Pin, GPIO_PIN_RESET);
+//
+//  /*Configure GPIO pin Output Level */
+//  HAL_GPIO_WritePin(USB_PowerSwitchOn_GPIO_Port, USB_PowerSwitchOn_Pin, GPIO_PIN_RESET);
+//
+//  /*Configure GPIO pin : B1_Pin */
+//  GPIO_InitStruct.Pin = B1_Pin;
+//  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+//  GPIO_InitStruct.Pull = GPIO_NOPULL;
+//  HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+//
+//  /*Configure GPIO pins : LD3_Pin LD2_Pin */
+//  GPIO_InitStruct.Pin = LD3_Pin|LD2_Pin;
+//  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+//  GPIO_InitStruct.Pull = GPIO_NOPULL;
+//  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+//  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+//
+//  /*Configure GPIO pin : USB_OverCurrent_Pin */
+//  GPIO_InitStruct.Pin = USB_OverCurrent_Pin;
+//  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+//  GPIO_InitStruct.Pull = GPIO_NOPULL;
+//  HAL_GPIO_Init(USB_OverCurrent_GPIO_Port, &GPIO_InitStruct);
+//
+//  /*Configure GPIO pin : USB_PowerSwitchOn_Pin */
+//  GPIO_InitStruct.Pin = USB_PowerSwitchOn_Pin;
+//  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+//  GPIO_InitStruct.Pull = GPIO_NOPULL;
+//  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+//  HAL_GPIO_Init(USB_PowerSwitchOn_GPIO_Port, &GPIO_InitStruct);
+//
+//  /*Configure GPIO pins : STLK_RX_Pin STLK_TX_Pin */
+//  GPIO_InitStruct.Pin = STLK_RX_Pin|STLK_TX_Pin;
+//  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+//  GPIO_InitStruct.Pull = GPIO_NOPULL;
+//  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+//  GPIO_InitStruct.Alternate = GPIO_AF8_LPUART1;
+//  HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+//
+//  /*Configure GPIO pins : USB_SOF_Pin USB_ID_Pin USB_DM_Pin USB_DP_Pin */
+//  GPIO_InitStruct.Pin = USB_SOF_Pin|USB_ID_Pin|USB_DM_Pin|USB_DP_Pin;
+//  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+//  GPIO_InitStruct.Pull = GPIO_NOPULL;
+//  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+//  GPIO_InitStruct.Alternate = GPIO_AF10_OTG_FS;
+//  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+//
+///* USER CODE BEGIN MX_GPIO_Init_2 */
+///* USER CODE END MX_GPIO_Init_2 */
+//}
+/* USER CODE BEGIN 4 */
+
+/* USER CODE END 4 */
+
+/**
+ * @brief  This function is executed in case of error occurrence.
+ * @retval None
+ */
+void Error_Handler(void) {
+	/* USER CODE BEGIN Error_Handler_Debug */
+	/* User can add his own implementation to report the HAL error return state */
+	__disable_irq();
+	while (1) {
+	}
+	/* USER CODE END Error_Handler_Debug */
+}
+
+#ifdef  USE_FULL_ASSERT
+/**
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
+void assert_failed(uint8_t *file, uint32_t line)
+{
+  /* USER CODE BEGIN 6 */
+  /* User can add his own implementation to report the file name and line number,
+     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+  /* USER CODE END 6 */
+}
+#endif /* USE_FULL_ASSERT */
